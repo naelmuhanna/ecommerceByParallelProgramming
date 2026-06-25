@@ -1,0 +1,23 @@
+
+==================================================
+  TASK 2.1 – RACE CONDITION DEMO (NO LOCKING)
+==================================================
+
+Stock reset to 1.
+Firing 10 simultaneous purchase requests (qty 1 each)...
+
+--------------------------------------------------
+  RESULT
+--------------------------------------------------
+Initial stock          : 1
+Concurrent requests    : 10
+Purchases SUCCEEDED    : 10   (should be 1)
+Purchases REJECTED     : 0
+Final stock in DB      : 0   (should be 0)
+Oversold units         : 9
+Elapsed                : 114 ms
+--------------------------------------------------
+
+❌ OVERSELLING OCCURRED — the race condition is proven.
+   10 customers were sold a product that had only 1 unit(s).
+

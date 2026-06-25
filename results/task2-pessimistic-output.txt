@@ -1,0 +1,22 @@
+
+==================================================
+  TASK 2.3 – PESSIMISTIC LOCKING (Redis mutex)
+==================================================
+
+Stock reset to 5.
+Firing 20 simultaneous purchases (qty 1 each)...
+
+--------------------------------------------------
+  RESULT
+--------------------------------------------------
+Initial stock          : 5
+Concurrent requests    : 20
+Purchases SUCCEEDED    : 5   (should be exactly 5)
+Rejected (out of stock): 15
+Rejected (lock busy)   : 0   (503 — could not acquire lock in time)
+Final stock in DB      : 0   (should be 0, never < 0)
+Elapsed                : 626 ms
+--------------------------------------------------
+
+✅ NO OVERSELL — the Redis mutex serialized access. Only available stock was sold.
+

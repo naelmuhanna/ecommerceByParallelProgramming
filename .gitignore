@@ -6,3 +6,6 @@ uploads/
 
 docs/
 README.md
+
+presentation/server.log
+presentation/mongo-rs.log

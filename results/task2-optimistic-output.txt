@@ -1,0 +1,22 @@
+
+==================================================
+  TASK 2.2 – OPTIMISTIC LOCKING (CAS + retry)
+==================================================
+
+Stock reset to 5.
+Firing 20 simultaneous purchases (qty 1 each)...
+
+--------------------------------------------------
+  RESULT
+--------------------------------------------------
+Initial stock          : 5
+Concurrent requests    : 20
+Purchases SUCCEEDED    : 5   (should be exactly 5)
+Purchases REJECTED     : 15   (out of stock)
+Succeeded after retry  : 3   (CAS conflicts resolved)
+Final stock in DB      : 0   (should be 0, never < 0)
+Elapsed                : 225 ms
+--------------------------------------------------
+
+✅ NO OVERSELL — exactly the available stock was sold. Race condition fixed.
+

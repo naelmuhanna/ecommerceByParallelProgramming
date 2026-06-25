@@ -68,6 +68,11 @@ const productSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Optimistic locking — incremented on every inventory write
+    lockVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

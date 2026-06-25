@@ -1,0 +1,41 @@
+
+==================================================
+  TASK 4 – STRESS TEST (Autocannon)
+==================================================
+
+Target        : http://localhost:8000
+Connections   : 100
+Duration      : 15s
+Workload      : browse + details + inventory purchase (mixed)
+
+Stock reset to 1000000 (sold reset to 0).
+
+Running load... (this takes ~15s)
+
+--------------------------------------------------
+  PERFORMANCE METRICS
+--------------------------------------------------
+Requests/sec (avg)     : 197.4
+Total requests         : 2961
+Latency avg            : 489.51 ms
+Latency P50            : 309 ms
+Latency P90            : 1083 ms
+Latency P95 (~p97.5)   : 1174 ms
+Latency P99            : 1231 ms
+Latency max            : 1389 ms
+Throughput             : 0.64 MB/s
+2xx responses          : 2163
+Non-2xx                : 798
+Errors / timeouts      : 0 / 0
+Error rate             : 26.95%
+--------------------------------------------------
+  STABILITY & INTEGRITY CHECK
+--------------------------------------------------
+Server still responding: YES
+Stock before / after   : 1000000 → 999869
+Units sold during test : 131
+Inventory consistent   : YES (quantity == initial - sold == 999869)
+--------------------------------------------------
+
+✅ STABLE — no crash, no inventory corruption under sustained load.
+

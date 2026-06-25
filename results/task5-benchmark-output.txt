@@ -1,0 +1,28 @@
+
+==================================================
+  TASK 5 – BENCHMARK: inventory write path
+==================================================
+Load: 100 connections × 10s, single hot product
+
+▶ BEFORE  — purchase-optimistic (read + CAS + retry)...
+  done: 103.8 rps, 90.7% 409s
+
+▶ AFTER   — purchase-atomic (single conditional update)...
+  done: 520 rps, 0.0% 409s
+
+--------------------------------------------------------------------
+Metric                  |   BEFORE(opt) |  AFTER(atomic)| Improvement
+--------------------------------------------------------------------
+Requests/sec            |        103.8 |          520 | +401.0%
+Latency avg (ms)        |       912.79 |       191.41 | -79.0%
+Latency P95 (ms)        |         1264 |          260 | -79.4%
+Latency P99 (ms)        |         1272 |          308 | -75.8%
+Successful purchases    |           97 |         5200 | +5260.8%
+409 conflicts           |          941 |            0 | -100.0%
+Error rate (%)          |         90.7 |          0.0 | 
+--------------------------------------------------------------------
+
+▶ Correctness check — atomic path must not oversell:
+  stock 5, 50 concurrent atomic buys → 5 succeeded, final stock 0
+  ✅ exactly 5 sold, no oversell — optimization preserves correctness.
+

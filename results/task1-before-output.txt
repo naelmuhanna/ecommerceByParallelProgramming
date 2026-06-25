@@ -1,0 +1,40 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   Task 1 – BEFORE: All Requests Hit MongoDB (Baseline)   ║
+╚══════════════════════════════════════════════════════════╝
+
+Method: cache is flushed before each request so every
+response is a cache miss → direct MongoDB query.
+
+Product ID : 6a0b1f21ab42fc4c547c4443
+Requests   : 50 per endpoint
+
+
+  GET /api/v1/products/:id  (50 reqs, cache flushed each time)
+..................................................  done
+
+  GET /api/v1/products      (50 reqs, cache flushed each time)
+..................................................  done
+
+╔══════════════════════════════════════════════════════════╗
+║             BEFORE – RESULTS SUMMARY                     ║
+╠══════════════════════════════════════════════════════════╣
+║  Single-product  (50 requests):                           ║
+║    avg  : 7.1 ms                                   ║
+║    min  : 5 ms                                     ║
+║    max  : 12 ms                                    ║
+║    MongoDB hits : 50/50                               ║
+╠══════════════════════════════════════════════════════════╣
+║  Product-list    (50 requests):                           ║
+║    avg  : 11.22 ms                                 ║
+║    min  : 7 ms                                     ║
+║    max  : 53 ms                                    ║
+║    MongoDB hits : 50/50                               ║
+╠══════════════════════════════════════════════════════════╣
+║  TOTAL: 100/100 requests hit MongoDB = 100% DB traffic  ║
+╚══════════════════════════════════════════════════════════╝
+
+Save these numbers, then run task1-after.js to compare:
+  Single-product avg : 7.1 ms
+  Product-list avg   : 11.22 ms
+

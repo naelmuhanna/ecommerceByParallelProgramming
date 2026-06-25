@@ -7,7 +7,13 @@
     "dev": "cross-env NODE_ENV=development nodemon server.js",
     "prod": "cross-env NODE_ENV=production node server.js",
     "seed:import": "node utils/dummyData/seeder.js -i",
-    "seed:destroy": "node utils/dummyData/seeder.js -d"
+    "seed:destroy": "node utils/dummyData/seeder.js -d",
+    "task_1": "node presentation/run-task.js 1",
+    "task_2": "node presentation/run-task.js 2",
+    "task_3": "node presentation/run-task.js 3",
+    "task_4": "node presentation/run-task.js 4",
+    "task_5": "node presentation/run-task.js 5",
+    "task_all": "node presentation/run-task.js all"
   },
   "keywords": [],
   "author": "",

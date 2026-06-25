@@ -1,0 +1,467 @@
+
+[36m╔═══════════════════════════════════════════════════════╗[0m
+[36m║ [0m[1mTASK 1 — Distributed Caching with Redis (Cache-Aside)[0m[36m ║[0m
+[36m║ [0m[1mdoc: docs/task-1-distributed-caching.md[0m              [36m ║[0m
+[36m╚═══════════════════════════════════════════════════════╝[0m
+
+[34m── [1mInfrastructure check[0m[34m ────────────────────────────────────────────[0m
+   [32m●[0m MongoDB (:27017) : [32mUP[0m
+   [31m○[0m Redis    (:6379)  : [31mDOWN[0m
+   [33m⚠ [0mRedis looks down — start it ("redis-server") or caching/locking tests will fail.
+
+[34m── [1mAPI server[0m[34m ──────────────────────────────────────────────────────[0m
+   [36mℹ [0mNo server detected — starting a temporary one in development mode...
+   [32m✓ [0mAPI server started on http://localhost:8000  (logs → presentation\server.log)
+
+[2m   step 1 / 3[0m
+
+[34m── [1mBEFORE — Baseline: cache flushed each request → 100% MongoDB traffic[0m[34m ───[0m
+
+╔══════════════════════════════════════════════════════════╗
+║   Task 1 – BEFORE: All Requests Hit MongoDB (Baseline)   ║
+╚══════════════════════════════════════════════════════════╝
+
+Method: cache is flushed before each request so every
+response is a cache miss → direct MongoDB query.
+
+   [33m⚠ [0mStep exited with code 1.
+
+[2m   step 2 / 3[0m
+
+[34m── [1mAFTER — Cache-Aside: MISS → HIT → INVALIDATION → FALLBACK (+ RESULTS)[0m[34m ───[0m
+
+╔══════════════════════════════════════════════════════════╗
+║   Task 1 – AFTER: Redis Cache-Aside Validation           ║
+╚══════════════════════════════════════════════════════════╝
+
+[Setup] Flushing product cache...
+[Setup] Product ID: 6a0b1f21ab42fc4c547c4443
+
+──────────────────────────────────────────────────────────
+PHASE 1 – Cache MISS  (first request, cold cache → MongoDB)
+──────────────────────────────────────────────────────────
+  cacheSource : mongodb
+  response    : 20 ms
+  RESULT: ✓ PASS – MongoDB queried on cache miss
+
+──────────────────────────────────────────────────────────
+PHASE 2 – Cache HIT  (20 requests after warm-up → Redis)
+──────────────────────────────────────────────────────────
+....................  done
+  avg    : 5.55 ms
+  min    : 3 ms
+  max    : 11 ms
+  hits   : 11 / 20
+  misses : 9
+  RESULT: ✗ FAIL – all 20 requests served from Redis without touching MongoDB
+  Speed  : 20 ms (MongoDB) → 5.55 ms (Redis) = ~72% faster
+
+──────────────────────────────────────────────────────────
+PHASE 3 – Cache INVALIDATION  (flush key → forces MongoDB re-query)
+──────────────────────────────────────────────────────────
+  Before flush : cacheSource = redis
+  Cache flushed (same operation as update/delete cache invalidation)
+  After flush  : cacheSource = mongodb
+  RESULT: ✓ PASS – invalidation forces cache miss → MongoDB re-queried
+
+──────────────────────────────────────────────────────────
+PHASE 4 – Redis FALLBACK  (error handling in utils/cache.js)
+──────────────────────────────────────────────────────────
+  All Redis calls in utils/cache.js are wrapped in try-catch:
+
+    getCache()            → returns null on error (cache miss fallback)
+    setCache()            → logs error, continues silently
+    deleteCache()         → logs error, continues silently
+    deleteCacheByPattern()→ logs error, continues silently
+
+  Result: if Redis goes down, productService.js falls through to MongoDB.
+  The API stays fully operational — cacheSource will show "mongodb".
+
+  To verify manually:
+    1. Stop Redis (redis-cli SHUTDOWN NOSAVE)
+    2. GET /api/v1/products/:id  →  cacheSource: "mongodb", no crash
+    3. Restart Redis
+  RESULT: ✓ PASS – Redis errors are caught; API falls back to MongoDB transparently
+
+╔══════════════════════════════════════════════════════════╗
+║                   FINAL SUMMARY                          ║
+╠══════════════════════════════════════════════════════════╣
+║  Phase 1 – Cache MISS         : PASS ✓                   ║
+║  Phase 2 – Cache HIT          : FAIL ✗                   ║
+║  Phase 3 – Cache INVALIDATION : PASS ✓                   ║
+║  Phase 4 – Redis FALLBACK      : PASS ✓                   ║
+╠══════════════════════════════════════════════════════════╣
+║  Server cache stats (since last restart):                 ║
+║    hits     : 12                                      ║
+║    misses   : 13                                      ║
+║    hit rate : 48.0%                                   ║
+╠══════════════════════════════════════════════════════════╣
+║  Latency comparison (single-product endpoint):            ║
+║    MongoDB (cold) : 20 ms                                  ║
+║    Redis   (hot)  : 5.55 ms                                ║
+║    Speedup        : ~72%        faster                    ║
+╠══════════════════════════════════════════════════════════╣
+║  Overall : SOME TESTS FAILED ✗                          ║
+╚══════════════════════════════════════════════════════════╝
+
+   [33m⚠ [0mStep exited with code 1.
+
+[2m   step 3 / 3[0m
+
+[34m── [1mENHANCEMENT — Popularity ranking via Redis Sorted Set (+ 60s cache)[0m[34m ───[0m
+
+╔══════════════════════════════════════════════════════════╗
+║   Task 1 – Popularity-Based Caching Test                 ║
+╚══════════════════════════════════════════════════════════╝
+
+── Step 1: Flush cache, view counters, and sorted set
+  All product cache keys cleared.
+
+── Step 2: Load 3 product IDs
+  Product A: 6a0b1f21ab42fc4c547c4443  "Fjallraven - Foldsack No. 1 "
+  Product B: 6a0b1f21ab42fc4c547c4444  "Mens Casual Premium Slim Fit"
+  Product C: 6a0b1f21ab42fc4c547c4445  "Mens Cotton Jacket"
+
+── Step 3: Simulate views (A=50, B=5, C=30)
+    Product A    (50 reqs) ..... done
+    Product B    ( 5 reqs) ..... done
+    Product C    (30 reqs) ... done
+  Note: threshold=10 → A cached from req #10, C from req #10, B never cached.
+
+── Step 4: GET /api/v1/products/popular (first call)
+  cacheSource : mongodb
+  products returned: 3
+
+  Top 3 in response:
+    #1: Product A  views=50  id=6a0b1f21ab42fc4c547c4443
+    #2: Product C  views=30  id=6a0b1f21ab42fc4c547c4445
+    #3: Product B  views=5  id=6a0b1f21ab42fc4c547c4444
+
+  ✓ PASS – first call served from MongoDB (cache miss on /popular)
+  ✓ PASS – all three products appear in the popular list
+  ✓ PASS – Product A(50) ranked above Product C(30)
+  ✓ PASS – Product C(30) ranked above Product B(5)
+
+── Step 5: GET /api/v1/products/popular (second call within 60-s TTL)
+  cacheSource : redis  (2 ms)
+  ✓ PASS – second call served from Redis (60-s cache hit)
+
+╔══════════════════════════════════════════════════════════╗
+║               POPULARITY TEST RESULTS                    ║
+╠══════════════════════════════════════════════════════════╣
+║  Views sent   : A=50   B=5    C=30                       ║
+║  Expected rank: #1 A(50)  #2 C(30)  #3 B(5)             ║
+╠══════════════════════════════════════════════════════════╣
+║  [1] First call – cacheSource=mongodb   : PASS ✓             ║
+║  [2] All 3 products in list             : PASS ✓             ║
+║  [3] A(50) ranked above C(30)           : PASS ✓             ║
+║  [4] C(30) ranked above B(5)            : PASS ✓             ║
+║  [5] Second call – cacheSource=redis    : PASS ✓             ║
+╠══════════════════════════════════════════════════════════╣
+║  Overall : ALL TESTS PASSED ✓                          ║
+╚══════════════════════════════════════════════════════════╝
+
+
+[2m────────────────────────────────────────────────────────────────────[0m
+  [1m📄 For the committee — what to open & explain[0m
+     Documentation : [36mdocs/task-1-distributed-caching.md[0m
+     Key code      : [36mutils/cache.js + services/productService.js (getProduct / getProducts)[0m
+     [33mNote: 2 step(s) returned a non-zero exit code — review the output above.[0m
+[2m────────────────────────────────────────────────────────────────────[0m
+
+[36m╔═════════════════════════════════════════════════════════════╗[0m
+[36m║ [0m[1mTASK 2 — Concurrency Control for Inventory (no overselling)[0m[36m ║[0m
+[36m║ [0m[1mdoc: docs/task-2-concurrency-control.md[0m                    [36m ║[0m
+[36m╚═════════════════════════════════════════════════════════════╝[0m
+
+[34m── [1mInfrastructure check[0m[34m ────────────────────────────────────────────[0m
+   [32m●[0m MongoDB (:27017) : [32mUP[0m
+   [32m●[0m Redis    (:6379)  : [32mUP[0m
+
+[34m── [1mAPI server[0m[34m ──────────────────────────────────────────────────────[0m
+   [32m✓ [0mAPI server is up on http://localhost:8000
+
+[34m── [1mProduct discovery[0m[34m ───────────────────────────────────────────────[0m
+   [32m✓ [0mUsing product id: 6a0b1f21ab42fc4c547c4443
+
+[2m   step 1 / 3[0m
+
+[34m── [1mBEFORE — No locking: race condition oversells the stock[0m[34m ─────────[0m
+
+==================================================
+  TASK 2.1 – RACE CONDITION DEMO (NO LOCKING)
+==================================================
+
+Stock reset to 1.
+Firing 10 simultaneous purchase requests (qty 1 each)...
+
+--------------------------------------------------
+  RESULT
+--------------------------------------------------
+Initial stock          : 1
+Concurrent requests    : 10
+Purchases SUCCEEDED    : 10   (should be 1)
+Purchases REJECTED     : 0
+Final stock in DB      : 0   (should be 0)
+Oversold units         : 9
+Elapsed                : 108 ms
+--------------------------------------------------
+
+❌ OVERSELLING OCCURRED — the race condition is proven.
+   10 customers were sold a product that had only 1 unit(s).
+
+
+[2m   step 2 / 3[0m
+
+[34m── [1mAFTER A — Optimistic locking (CAS on lockVersion + bounded retry)[0m[34m ───[0m
+
+==================================================
+  TASK 2.2 – OPTIMISTIC LOCKING (CAS + retry)
+==================================================
+
+Stock reset to 5.
+Firing 20 simultaneous purchases (qty 1 each)...
+
+--------------------------------------------------
+  RESULT
+--------------------------------------------------
+Initial stock          : 5
+Concurrent requests    : 20
+Purchases SUCCEEDED    : 5   (should be exactly 5)
+Purchases REJECTED     : 15   (out of stock)
+Succeeded after retry  : 2   (CAS conflicts resolved)
+Final stock in DB      : 0   (should be 0, never < 0)
+Elapsed                : 164 ms
+--------------------------------------------------
+
+✅ NO OVERSELL — exactly the available stock was sold. Race condition fixed.
+
+
+[2m   step 3 / 3[0m
+
+[34m── [1mAFTER B — Pessimistic locking (Redis distributed mutex)[0m[34m ─────────[0m
+
+==================================================
+  TASK 2.3 – PESSIMISTIC LOCKING (Redis mutex)
+==================================================
+
+Stock reset to 5.
+Firing 20 simultaneous purchases (qty 1 each)...
+
+--------------------------------------------------
+  RESULT
+--------------------------------------------------
+Initial stock          : 5
+Concurrent requests    : 20
+Purchases SUCCEEDED    : 5   (should be exactly 5)
+Rejected (out of stock): 15
+Rejected (lock busy)   : 0   (503 — could not acquire lock in time)
+Final stock in DB      : 0   (should be 0, never < 0)
+Elapsed                : 624 ms
+--------------------------------------------------
+
+✅ NO OVERSELL — the Redis mutex serialized access. Only available stock was sold.
+
+
+[2m────────────────────────────────────────────────────────────────────[0m
+  [1m📄 For the committee — what to open & explain[0m
+     Documentation : [36mdocs/task-2-concurrency-control.md[0m
+     Key code      : [36mservices/inventoryService.js (purchaseUnsafe / purchaseOptimistic / purchasePessimistic)[0m
+[2m────────────────────────────────────────────────────────────────────[0m
+
+[36m╔════════════════════════════════════════════════════════════════╗[0m
+[36m║ [0m[1mTASK 3 — Transaction Integrity (ACID, all-or-nothing checkout)[0m[36m ║[0m
+[36m║ [0m[1mdoc: docs/task-3-transaction-integrity.md[0m                     [36m ║[0m
+[36m╚════════════════════════════════════════════════════════════════╝[0m
+
+[34m── [1mMongoDB replica set (required for Task 3 transactions)[0m[34m ──────────[0m
+   [36mℹ [0mStarting a throwaway single-node replica set (rs0) on :27018...
+   [36mℹ [0mReplica set already initialized — waiting for PRIMARY...
+   [32m✓ [0mReplica set rs0 on :27018 is ready  (logs → presentation\mongo-rs.log)
+
+[2m   step 1 / 2[0m
+
+[34m── [1mBEFORE — No transaction: payment + stock change but NO order (partial state)[0m[34m ───[0m
+
+==================================================
+  TASK 3.1 – NO TRANSACTION (partial-state failure)
+==================================================
+
+BEFORE  → stock: 5, sold: 0, orders: 0
+
+Running checkout WITHOUT a transaction, forcing the order step to crash...
+✖ Checkout threw: SIMULATED CRASH: order persistence failed after payment + inventory update
+
+--------------------------------------------------
+  DATABASE STATE AFTER THE FAILURE
+--------------------------------------------------
+Payment charged        : YES (customer billed)
+Stock before / after   : 5 → 4  (decremented)
+Sold before / after    : 0 → 1
+Orders before / after  : 0 → 0  (NO order created)
+--------------------------------------------------
+
+❌ INCONSISTENT STATE — payment taken & stock reduced, but NO order exists.
+   This is exactly what transactions must prevent.
+
+
+[2m   step 2 / 2[0m
+
+[34m── [1mAFTER — Transaction: rollback on failure + concurrent consistency[0m[34m ───[0m
+
+==================================================
+  TASK 3.2/3.3 – MONGODB TRANSACTIONS
+==================================================
+
+--- Part A: Atomic rollback on a forced failure ---
+
+BEFORE → stock: 5, orders: 0
+✖ Checkout threw (expected): SIMULATED CRASH: order persistence failed after payment + inventory update
+AFTER  → stock: 5, orders: 0
+✅ ROLLED BACK — stock unchanged, no order. No partial state.
+
+--- Part B: Concurrent transactional checkouts ---
+
+Stock = 5; firing 15 concurrent transactional checkouts (qty 1)...
+
+--------------------------------------------------
+  CONCURRENT RESULT
+--------------------------------------------------
+Initial stock          : 5
+Concurrent checkouts   : 15
+Committed (orders)     : 5
+Rejected (stock/conflict): 10
+Final stock            : 0   (never < 0)
+Orders created         : 5
+Units sold (sold field): 5
+--------------------------------------------------
+
+✅ CONSISTENT — orders created == stock consumed == sold; no oversell, no partial updates.
+
+
+[2m────────────────────────────────────────────────────────────────────[0m
+  [1m📄 For the committee — what to open & explain[0m
+     Documentation : [36mdocs/task-3-transaction-integrity.md[0m
+     Key code      : [36mservices/checkoutService.js (runCheckout: startSession / startTransaction / commit / abort)[0m
+[2m────────────────────────────────────────────────────────────────────[0m
+
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║ [0m[1mTASK 4 — Stress Testing (stability under heavy load)[0m[36m ║[0m
+[36m║ [0m[1mdoc: docs/task-4-stress-testing.md[0m                  [36m ║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+[34m── [1mInfrastructure check[0m[34m ────────────────────────────────────────────[0m
+   [32m●[0m MongoDB (:27017) : [32mUP[0m
+   [32m●[0m Redis    (:6379)  : [32mUP[0m
+
+[34m── [1mAPI server[0m[34m ──────────────────────────────────────────────────────[0m
+   [32m✓ [0mAPI server is up on http://localhost:8000
+
+[34m── [1mProduct discovery[0m[34m ───────────────────────────────────────────────[0m
+   [32m✓ [0mUsing product id: 6a0b1f21ab42fc4c547c4443
+
+[2m   step 1 / 1[0m
+
+[34m── [1mLOAD + RESULTS — 100 connections × 15s mixed workload + integrity assertion[0m[34m ───[0m
+
+==================================================
+  TASK 4 – STRESS TEST (Autocannon)
+==================================================
+
+Target        : http://localhost:8000
+Connections   : 100
+Duration      : 15s
+Workload      : browse + details + inventory purchase (mixed)
+
+Stock reset to 1000000 (sold reset to 0).
+
+Running load... (this takes ~15s)
+
+--------------------------------------------------
+  PERFORMANCE METRICS
+--------------------------------------------------
+Requests/sec (avg)     : 204.34
+Total requests         : 3065
+Latency avg            : 475.81 ms
+Latency P50            : 300 ms
+Latency P90            : 1046 ms
+Latency P95 (~p97.5)   : 1320 ms
+Latency P99            : 1396 ms
+Latency max            : 1689 ms
+Throughput             : 0.66 MB/s
+2xx responses          : 2210
+Non-2xx                : 855
+Errors / timeouts      : 0 / 0
+Error rate             : 27.90%
+--------------------------------------------------
+  STABILITY & INTEGRITY CHECK
+--------------------------------------------------
+Server still responding: YES
+Stock before / after   : 1000000 → 999864
+Units sold during test : 136
+Inventory consistent   : YES (quantity == initial - sold == 999864)
+--------------------------------------------------
+
+✅ STABLE — no crash, no inventory corruption under sustained load.
+
+
+[2m────────────────────────────────────────────────────────────────────[0m
+  [1m📄 For the committee — what to open & explain[0m
+     Documentation : [36mdocs/task-4-stress-testing.md[0m
+     Key code      : [36mtest/task4-stress.js (Autocannon mixed workload + post-run inventory integrity check)[0m
+[2m────────────────────────────────────────────────────────────────────[0m
+
+[36m╔════════════════════════════════════════════════════════════╗[0m
+[36m║ [0m[1mTASK 5 — Benchmarking & Bottleneck Fix (atomic write path)[0m[36m ║[0m
+[36m║ [0m[1mdoc: docs/task-5-benchmarking.md[0m                          [36m ║[0m
+[36m╚════════════════════════════════════════════════════════════╝[0m
+
+[34m── [1mInfrastructure check[0m[34m ────────────────────────────────────────────[0m
+   [32m●[0m MongoDB (:27017) : [32mUP[0m
+   [32m●[0m Redis    (:6379)  : [32mUP[0m
+
+[34m── [1mAPI server[0m[34m ──────────────────────────────────────────────────────[0m
+   [32m✓ [0mAPI server is up on http://localhost:8000
+
+[34m── [1mProduct discovery[0m[34m ───────────────────────────────────────────────[0m
+   [32m✓ [0mUsing product id: 6a0b1f21ab42fc4c547c4443
+
+[2m   step 1 / 1[0m
+
+[34m── [1mBEFORE vs AFTER + RESULTS — optimistic vs atomic benchmark + oversell check[0m[34m ───[0m
+
+==================================================
+  TASK 5 – BENCHMARK: inventory write path
+==================================================
+Load: 100 connections × 10s, single hot product
+
+▶ BEFORE  — purchase-optimistic (read + CAS + retry)...
+  done: 112.9 rps, 90.5% 409s
+
+▶ AFTER   — purchase-atomic (single conditional update)...
+  done: 389.6 rps, 0.0% 409s
+
+--------------------------------------------------------------------
+Metric                  |   BEFORE(opt) |  AFTER(atomic)| Improvement
+--------------------------------------------------------------------
+Requests/sec            |        112.9 |        389.6 | +245.1%
+Latency avg (ms)        |       870.24 |       254.28 | -70.8%
+Latency P95 (ms)        |         1296 |          567 | -56.3%
+Latency P99 (ms)        |         1297 |          585 | -54.9%
+Successful purchases    |          107 |         3896 | +3541.1%
+409 conflicts           |         1022 |            0 | -100.0%
+Error rate (%)          |         90.5 |          0.0 | 
+--------------------------------------------------------------------
+
+▶ Correctness check — atomic path must not oversell:
+  stock 5, 50 concurrent atomic buys → 5 succeeded, final stock 0
+  ✅ exactly 5 sold, no oversell — optimization preserves correctness.
+
+
+[2m────────────────────────────────────────────────────────────────────[0m
+  [1m📄 For the committee — what to open & explain[0m
+     Documentation : [36mdocs/task-5-benchmarking.md[0m
+     Key code      : [36mservices/inventoryService.js (purchaseAtomic: single conditional findOneAndUpdate)[0m
+[2m────────────────────────────────────────────────────────────────────[0m
+   [36mℹ [0mStopping the temporary API server...
+   [36mℹ [0mStopping the throwaway replica set...

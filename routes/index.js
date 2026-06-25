@@ -1,4 +1,5 @@
 const categoryRoute = require('./categoryRoute');
+const inventoryRoute = require('./inventoryRoute');
 const subCategoryRoute = require('./subCategoryRoute');
 const brandRoute = require('./brandRoute');
 const productRoute = require('./productRoute');
@@ -24,6 +25,7 @@ const mountRoutes = (app) => {
   app.use('/api/v1/coupons', couponRoute);
   app.use('/api/v1/cart', cartRoute);
   app.use('/api/v1/orders', orderRoute);
+  app.use('/api/v1/inventory', inventoryRoute);
 };
 
 module.exports = mountRoutes;

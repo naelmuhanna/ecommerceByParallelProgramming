@@ -1,0 +1,22 @@
+
+==================================================
+  TASK 3.1 – NO TRANSACTION (partial-state failure)
+==================================================
+
+BEFORE  → stock: 5, sold: 0, orders: 0
+
+Running checkout WITHOUT a transaction, forcing the order step to crash...
+✖ Checkout threw: SIMULATED CRASH: order persistence failed after payment + inventory update
+
+--------------------------------------------------
+  DATABASE STATE AFTER THE FAILURE
+--------------------------------------------------
+Payment charged        : YES (customer billed)
+Stock before / after   : 5 → 4  (decremented)
+Sold before / after    : 0 → 1
+Orders before / after  : 0 → 0  (NO order created)
+--------------------------------------------------
+
+❌ INCONSISTENT STATE — payment taken & stock reduced, but NO order exists.
+   This is exactly what transactions must prevent.
+

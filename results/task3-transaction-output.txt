@@ -1,0 +1,30 @@
+
+==================================================
+  TASK 3.2/3.3 – MONGODB TRANSACTIONS
+==================================================
+
+--- Part A: Atomic rollback on a forced failure ---
+
+BEFORE → stock: 5, orders: 0
+✖ Checkout threw (expected): SIMULATED CRASH: order persistence failed after payment + inventory update
+AFTER  → stock: 5, orders: 0
+✅ ROLLED BACK — stock unchanged, no order. No partial state.
+
+--- Part B: Concurrent transactional checkouts ---
+
+Stock = 5; firing 15 concurrent transactional checkouts (qty 1)...
+
+--------------------------------------------------
+  CONCURRENT RESULT
+--------------------------------------------------
+Initial stock          : 5
+Concurrent checkouts   : 15
+Committed (orders)     : 5
+Rejected (stock/conflict): 10
+Final stock            : 0   (never < 0)
+Orders created         : 5
+Units sold (sold field): 5
+--------------------------------------------------
+
+✅ CONSISTENT — orders created == stock consumed == sold; no oversell, no partial updates.
+
